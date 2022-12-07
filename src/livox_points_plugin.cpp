@@ -94,7 +94,7 @@ void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr
     ROS_INFO_STREAM("sample:" << samplesStep);
     ROS_INFO_STREAM("downsample:" << downSample);
 
-    publishPointCloudType = sdfPtr->Get<uint16_t>("publish_pointcloud_type");
+    publishPointCloudType = sdfPtr->Get<int>("publish_pointcloud_type");
     ROS_INFO_STREAM("publish_pointcloud_type: " << publishPointCloudType);
     ros::init(argc, argv, curr_scan_topic);
     rosNode.reset(new ros::NodeHandle);
