@@ -14,8 +14,8 @@ find_package(catkin REQUIRED COMPONENTS
 if(POLICY CMP0054)
     cmake_policy(SET CMP0054 NEW)
 endif()
-find_package(gazebo REQUIRED)
-find_package(PCL REQUIRED)
+find_package(gazebo 9 REQUIRED)
+find_package(PCL 1.12 REQUIRED)
 link_directories(${GAZEBO_LIBRARY_DIRS})
 
 include_directories(
@@ -36,8 +36,6 @@ target_link_libraries(livox_laser_simulation ${catkin_LIBRARIES} ${GAZEBO_LIBRAR
 
 install(DIRECTORY include/${PROJECT_NAME}/
     DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-    FILES_MATCHING PATTERN "*.h"
-    PATTERN ".svn" EXCLUDE
 )
 
 install(TARGETS livox_laser_simulation
