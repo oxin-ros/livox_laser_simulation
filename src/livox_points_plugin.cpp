@@ -89,8 +89,7 @@ void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr
     ROS_INFO_STREAM("downsample:" << downSample);
 
     namespace_ = sdfPtr->Get<std::string>("robotNamespace");
-    ROS_WARN_STREAM("Plugin namespace set to: " << namespace_);
-
+    ROS_INFO_STREAM("namespace: " << namespace_);
     publishPointCloudType = sdfPtr->Get<int>("publish_pointcloud_type");
     ROS_INFO_STREAM("publish_pointcloud_type: " << publishPointCloudType);
     ros::init(argc, argv, curr_scan_topic);
@@ -374,7 +373,7 @@ void LivoxPointsPlugin::PublishPointCloud(std::vector<std::pair<int, AviaRotateI
             scan_points.back().z = point.Z();
         }
     }
-    if(rosPointPub.getNumSubscribers() > 0 && !scan_point.data.empty()) {
+    if(rosPointPub.getNumSubscribers() > 0 && !scan_point.points.empty()) {
         rosPointPub.publish(scan_point);
     }
     ros::spinOnce();
@@ -410,7 +409,7 @@ void LivoxPointsPlugin::PublishPointCloud2XYZI(std::vector<std::pair<int, AviaRo
             const auto index = (verticalRayCount - verticle_index - 1) * rayCount + horizon_index;
             const auto range = rayShape->GetRange(pair.first);
             const auto intensity = rayShape->GetRetro(pair.first);
-            if (range >= RangeMax() || range <= RangeMin() || abs(range) <= 1e-5) continue;
+            if (range >= RangeMax() || range <= RangeMin()) continue;
 
             scan->set_ranges(index, range);
             scan->set_intensities(index, intensity);
@@ -433,7 +432,7 @@ void LivoxPointsPlugin::PublishPointCloud2XYZI(std::vector<std::pair<int, AviaRo
             }
         }
     }
-    if(rosPointPub.getNumSubscribers() > 0 && !scan_point.data.empty()) {
+    if(rosPointPub.getNumSubscribers() > 0 && pt_count > 0) {
         pc.resize(pt_count);
         pcl::toROSMsg(pc, scan_point);
         scan_point.header.stamp = timestamp;
@@ -495,8 +494,8 @@ void LivoxPointsPlugin::PublishPointCloud2XYZRTL(std::vector<std::pair<int, Avia
             pc.push_back(std::move(pt));
         }
     }
+    pcl::toROSMsg(pc, scan_point);
     if(rosPointPub.getNumSubscribers() > 0 && !scan_point.data.empty()) {
-        pcl::toROSMsg(pc, scan_point);
         scan_point.header.stamp = timestamp;
         scan_point.header.frame_id = "livox";
         rosPointPub.publish(scan_point);
