@@ -347,21 +347,20 @@ void LivoxPointsPlugin::PublishPointCloud(std::vector<std::pair<int, AviaRotateI
     scan_point.header.stamp = ros::Time::now();
     scan_point.header.frame_id = "livox";
     auto &scan_points = scan_point.points;
-    for (auto &pair : points_pair) {
-        const int verticle_index = roundf((pair.second.zenith - verticle_min) / verticle_incre);
-        const int horizon_index = roundf((pair.second.azimuth - angle_min) / angle_incre);
+    for (const auto &[p_index, rotate_info] : points_pair) {  // std::pair<int, gazebo::AviaRotateInfo>
+        const int verticle_index = roundf((rotate_info.zenith - verticle_min) / verticle_incre);
+        const int horizon_index = roundf((rotate_info.azimuth - angle_min) / angle_incre);
         if (verticle_index < 0 || horizon_index < 0) {
             continue;
         }
         if (verticle_index < verticalRayCount && horizon_index < rayCount) {
             const auto index = (verticalRayCount - verticle_index - 1) * rayCount + horizon_index;
-            const auto range = rayShape->GetRange(pair.first);
-            const auto intensity = rayShape->GetRetro(pair.first);
+            const auto range = rayShape->GetRange(p_index);
+            const auto intensity = rayShape->GetRetro(p_index);
             if (range >= RangeMax() || range <= RangeMin()) continue;
             scan->set_ranges(index, range);
             scan->set_intensities(index, intensity);
 
-            const auto rotate_info = pair.second;
             ignition::math::Quaterniond ray;
             ray.Euler(ignition::math::Vector3d(0.0, rotate_info.zenith, rotate_info.azimuth));
 
@@ -373,6 +372,8 @@ void LivoxPointsPlugin::PublishPointCloud(std::vector<std::pair<int, AviaRotateI
             scan_points.back().z = point.Z();
         }
     }
+    // Only publish scan point if there are subscribers AND if there are points to publish
+    // This prevents the "empty scan" warning in the robot side from being printed
     if(rosPointPub.getNumSubscribers() > 0 && !scan_point.points.empty()) {
         rosPointPub.publish(scan_point);
     }
@@ -400,21 +401,19 @@ void LivoxPointsPlugin::PublishPointCloud2XYZI(std::vector<std::pair<int, AviaRo
     const auto timestamp = ros::Time::now();
     int pt_count = 0;
 #pragma omp parallel for
-    for (int i = 0; i < points_pair.size(); ++i) {
-        const auto &pair = points_pair[i];  // std::pair<int, gazebo::AviaRotateInfo>
-        const int verticle_index = roundf((pair.second.zenith - verticle_min) / verticle_incre);
-        const int horizon_index = roundf((pair.second.azimuth - angle_min) / angle_incre);
+    for (const auto& [p_index, rotate_info] : points_pair) {  // std::pair<int, gazebo::AviaRotateInfo>
+        const int verticle_index = roundf((rotate_info.zenith - verticle_min) / verticle_incre);
+        const int horizon_index = roundf((rotate_info.azimuth - angle_min) / angle_incre);
         if (verticle_index < 0 || horizon_index < 0) continue;
         if (verticle_index < verticalRayCount && horizon_index < rayCount) {
             const auto index = (verticalRayCount - verticle_index - 1) * rayCount + horizon_index;
-            const auto range = rayShape->GetRange(pair.first);
-            const auto intensity = rayShape->GetRetro(pair.first);
+            const auto range = rayShape->GetRange(p_index);
+            const auto intensity = rayShape->GetRetro(p_index);
             if (range >= RangeMax() || range <= RangeMin()) continue;
 
             scan->set_ranges(index, range);
             scan->set_intensities(index, intensity);
 
-            const auto rotate_info = pair.second;
             ignition::math::Quaterniond ray;
             ray.Euler(ignition::math::Vector3d(0.0, rotate_info.zenith, rotate_info.azimuth));
             const auto axis = ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
@@ -461,24 +460,22 @@ void LivoxPointsPlugin::PublishPointCloud2XYZRTL(std::vector<std::pair<int, Avia
     pcl::PointCloud<pcl::LivoxPointXyzrtl> pc;
     pc.points.reserve(points_pair.size());
     const auto timestamp = ros::Time::now();
-    for (int i = 0; i < points_pair.size(); ++i) {
-        const auto &pair = points_pair[i];  // std::pair<int, AviaRotateInfo>
-        const int verticle_index = roundf((pair.second.zenith - verticle_min) / verticle_incre);
-        const int horizon_index = roundf((pair.second.azimuth - angle_min) / angle_incre);
+    for (const auto& [p_index, rotate_info] : points_pair) {  // std::pair<int, gazebo::AviaRotateInfo>
+        const int verticle_index = roundf((rotate_info.zenith - verticle_min) / verticle_incre);
+        const int horizon_index = roundf((rotate_info.azimuth - angle_min) / angle_incre);
         if (verticle_index < 0 || horizon_index < 0) {
             continue;
         }
         if (verticle_index < verticalRayCount && horizon_index < rayCount) {
             const auto index = (verticalRayCount - verticle_index - 1) * rayCount + horizon_index;
-            const auto range = rayShape->GetRange(pair.first);
-            const auto intensity = rayShape->GetRetro(pair.first);
+            const auto range = rayShape->GetRange(p_index);
+            const auto intensity = rayShape->GetRetro(p_index);
             if (range >= RangeMax() || range <= RangeMin() || abs(range) <= 1e-5) {
                 continue;
             }
             scan->set_ranges(index, range);
             scan->set_intensities(index, intensity);
 
-            const auto rotate_info = pair.second;
             ignition::math::Quaterniond ray;
             ray.Euler(ignition::math::Vector3d(0.0, rotate_info.zenith, rotate_info.azimuth));
 
@@ -490,7 +487,7 @@ void LivoxPointsPlugin::PublishPointCloud2XYZRTL(std::vector<std::pair<int, Avia
             pt.z = point.Z();
             pt.reflectivity = static_cast<float>(intensity);
             pt.tag = 0;
-            pt.line = pair.second.line;
+            pt.line = rotate_info.line;
             pc.push_back(std::move(pt));
         }
     }
@@ -527,24 +524,22 @@ void LivoxPointsPlugin::PublishLivoxROSDriverCustomMsg(std::vector<std::pair<int
     msg.timebase = tn.tv_nsec;
     msg.header.stamp = ros::Time::now();
     const auto timestamp = ros::Time::now();
-    for (int i = 0; i < points_pair.size(); ++i) {
-        const auto &pair = points_pair[i];  // std::pair<int, AviaRotateInfo>
-        const int verticle_index = roundf((pair.second.zenith - verticle_min) / verticle_incre);
-        const int horizon_index = roundf((pair.second.azimuth - angle_min) / angle_incre);
+    for (const auto& [p_index, rotate_info] : points_pair) {  // std::pair<int, gazebo::AviaRotateInfo>
+        const int verticle_index = roundf((rotate_info.zenith - verticle_min) / verticle_incre);
+        const int horizon_index = roundf((rotate_info.azimuth - angle_min) / angle_incre);
         if (verticle_index < 0 || horizon_index < 0) {
             continue;
         }
         if (verticle_index < verticalRayCount && horizon_index < rayCount) {
             const auto index = (verticalRayCount - verticle_index - 1) * rayCount + horizon_index;
-            const auto range = rayShape->GetRange(pair.first);
-            const auto intensity = rayShape->GetRetro(pair.first);
+            const auto range = rayShape->GetRange(p_index);
+            const auto intensity = rayShape->GetRetro(p_index);
             if (range >= RangeMax() || range <= RangeMin() || abs(range) <= 1e-5) {
                 continue;
             }
             scan->set_ranges(index, range);
             scan->set_intensities(index, intensity);
 
-            const auto rotate_info = pair.second;
             ignition::math::Quaterniond ray;
             ray.Euler(ignition::math::Vector3d(0.0, rotate_info.zenith, rotate_info.azimuth));
 
@@ -555,7 +550,7 @@ void LivoxPointsPlugin::PublishLivoxROSDriverCustomMsg(std::vector<std::pair<int
             pt.y = point.Y();
             pt.z = point.Z();
             pt.reflectivity = 100;
-            pt.line = pair.second.line;
+            pt.line = rotate_info.line;
             pt.tag = 0x10;
             msg.points.push_back(pt);
         }
