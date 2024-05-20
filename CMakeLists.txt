@@ -17,8 +17,8 @@ find_package(catkin REQUIRED COMPONENTS
 if(POLICY CMP0054)
     cmake_policy(SET CMP0054 NEW)
 endif()
-find_package(gazebo 9 REQUIRED)
-find_package(PCL 1.12 REQUIRED)
+find_package(gazebo REQUIRED)
+find_package(PCL REQUIRED)
 link_directories(${GAZEBO_LIBRARY_DIRS})
 
 include_directories(
